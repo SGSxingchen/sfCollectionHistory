@@ -114,7 +114,7 @@ docker volume inspect sfcollectionhistory_mysql_data
 如需备份数据库：
 
 ```bash
-docker exec sf-mysql mysqldump -usf_root -plijiaxinga1. sf_selectrion > backup.sql
+docker exec sf-mysql mysqldump -usf_root -plijiaxinga1. sf_selectrion > backup.sql --no-tablespaces
 ```
 
 如需恢复：

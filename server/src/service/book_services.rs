@@ -5,7 +5,6 @@ use crate::model::response::{ResponsPagerList, ResponsPagerListFrom};
 use crate::{model::book::Book, mysql::client};
 use actix_web::{self};
 use futures::try_join;
-use rand::Rng;
 use regex::Regex;
 use reqwest;
 use scraper::{Html, Selector};
@@ -26,11 +25,6 @@ static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .build()
         .unwrap()
 });
-
-async fn random_delay(min_ms: u64, max_ms: u64) {
-    let delay = rand::thread_rng().gen_range(min_ms..=max_ms);
-    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-}
 
 pub struct BookServices;
 impl BookServices {
@@ -475,19 +469,28 @@ impl BookServices {
         let mut label_type = String::new();
         let mut finish = 0;
         let mut word_count = 0;
-        // 并发请求
-        let master_web_feature = HTTP_CLIENT.get(&url).send();
-        let mobild_web_feature = HTTP_CLIENT.get(&label_info_url).send();
-        // 等待主站请求响应
-        let response = master_web_feature
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-        // 等待移动端请求响应
-        let label_info_response = mobild_web_feature
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-        // 随机延迟 1~3s，模拟浏览器行为
-        random_delay(1000, 3000).await;
+        // 构建所有API请求URL
+        let comments_url = format!(
+            "{}/ajax/ashx/Common.ashx?op=getcomment&nid={}&_={}",
+            base_head_url,
+            book_id,
+            chrono::Utc::now().timestamp_millis()
+        );
+        let ticket_info_url = format!(
+            "{}{}",
+            base_head_url, "/ajax/ashx/Common.ashx?op=ticketinfo"
+        );
+        let bonus_info_url =
+            format!("{}{}", base_head_url, "/ajax/ashx/Common.ashx?op=bonusinfo");
+
+        // 5个请求全部并发
+        let (response, label_info_response, comments_response, ticket_info_response, bonus_info_response) = try_join!(
+            HTTP_CLIENT.get(&url).send(),
+            HTTP_CLIENT.get(&label_info_url).send(),
+            HTTP_CLIENT.get(&comments_url).send(),
+            HTTP_CLIENT.post(&ticket_info_url).form(&[("nid", book_id.to_string())]).send(),
+            HTTP_CLIENT.post(&bonus_info_url).form(&[("nid", book_id.to_string())]).send(),
+        ).map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
         // 确保请求成功
         if response.status().is_success() {
             // 获取响应的文本内容
@@ -549,17 +552,7 @@ impl BookServices {
                     }
                 }
             }
-            // 查询评论数
-            let comments_url = format!(
-                "{}/ajax/ashx/Common.ashx?op=getcomment&nid={}&_={}",
-                base_head_url.clone(),
-                book_id,
-                chrono::Utc::now().timestamp_millis()
-            );
-            let comments_response = HTTP_CLIENT.get(&comments_url).send()
-                .await
-                .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-
+            // 处理评论数据
             if comments_response.status().is_success() {
                 let comments_data: serde_json::Value = comments_response
                     .json()
@@ -574,8 +567,6 @@ impl BookServices {
                     "Failed to fetch comments",
                 ));
             }
-            // 随机延迟 1~3s
-            random_delay(1000, 3000).await;
             // 查询书本封面
             let cover_selector = Selector::parse(".books-box .left-part .figure .pic img").unwrap();
             if let Some(cover_element) = document.select(&cover_selector).next() {
@@ -587,19 +578,7 @@ impl BookServices {
                     "Failed to fetch cover image",
                 ));
             }
-            // 查询今日月票数据
-            let ticket_info_url = format!(
-                "{}{}",
-                base_head_url, "/ajax/ashx/Common.ashx?op=ticketinfo"
-            );
-
-            let ticket_info_response = HTTP_CLIENT
-                .post(&ticket_info_url)
-                .form(&[("nid", book_id.to_string())])
-                .send()
-                .await
-                .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-
+            // 处理月票数据
             if ticket_info_response.status().is_success() {
                 let ticket_data: serde_json::Value = ticket_info_response
                     .json()
@@ -615,19 +594,7 @@ impl BookServices {
                     "Failed to fetch ticket info",
                 ));
             }
-            // 随机延迟 1~3s
-            random_delay(1000, 3000).await;
-            // 查询今日打赏数据
-            let bonus_info_url =
-                format!("{}{}", base_head_url, "/ajax/ashx/Common.ashx?op=bonusinfo");
-
-            let bonus_info_response = HTTP_CLIENT
-                .post(&bonus_info_url)
-                .form(&[("nid", book_id.to_string())])
-                .send()
-                .await
-                .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-
+            // 处理打赏数据
             if bonus_info_response.status().is_success() {
                 let bonus_data: serde_json::Value = bonus_info_response
                     .json()

@@ -36,14 +36,13 @@ const addBookWithRetry = async (number) => {
 }
 
 const analyzeBooks = async (pageNum) => {
-  const data = await request.get(`/List/default.aspx?tid=-1&&ud=30&PageIndex=${pageNum}`);
+  const data = await request.get(`/List/default.aspx?tid=-1&&ud=7&PageIndex=${pageNum}`);
   if (data.status === 200) {
     const $ = cheerio.load(data.data);
     const booksLink = $(".bsubcon .Comic_Pic_List>.Conjunction>a");
     if (booksLink.length === 0) {
       return -1;
     }
-    // 顺序处理每本书，避免并发请求被封禁
     const links = []
     booksLink.each((index, element) => {
       const href = $(element).attr('href');
@@ -54,10 +53,12 @@ const analyzeBooks = async (pageNum) => {
         console.log('No match found');
       }
     })
-    for (const number of links) {
-      await addBookWithRetry(number)
-      // 每本书之间随机延迟 2~5s
-      await randomDelay(2000, 5000)
+    console.log(`第 ${pageNum} 页共 ${links.length} 本书`)
+    // 3本并发调用后端API（调用的是localhost，无需反爬延迟）
+    for (let i = 0; i < links.length; i += 3) {
+      const batch = links.slice(i, i + 3)
+      console.log(`  处理 ${i + 1}-${Math.min(i + 3, links.length)}/${links.length}`)
+      await Promise.all(batch.map(number => addBookWithRetry(number)))
     }
   }
 }
@@ -66,15 +67,16 @@ const getStore = async () => {
   try {
     let pageNum = 1
     while (true) {
+      console.log(`正在处理第 ${pageNum} 页...`)
       const res = await analyzeBooks(pageNum);
       // 没查询到数据,爬到底了,直接中断
       if (res === -1) {
-        console.log(`获取完成, 共${pageNum}页`)
+        console.log(`获取完成, 共${pageNum - 1}页`)
         break;
       }
       pageNum++
-      // 每页之间随机延迟 3~8s
-      await randomDelay(3000, 8000)
+      // 页间延迟 1~3s
+      await randomDelay(1000, 3000)
     }
   } catch (err) {
     console.log(err)

@@ -62,8 +62,8 @@ async fn async_fn() -> Result<(), actix_web::Error> {
             let permit = semaphore_clone.acquire_owned().await.unwrap();
             // 执行耗费资源的异步任务
             let res = push_sf_book_new_data(id).await;
-            // 任务完成后随机延迟 2~5s，控制整体请求频率
-            let delay = rand::thread_rng().gen_range(2000..=5000);
+            // 任务完成后短暂延迟，控制整体请求频率
+            let delay = rand::thread_rng().gen_range(500..=1500);
             tokio::time::sleep(Duration::from_millis(delay)).await;
             // 显式释放许可，让其他等待的任务可以获取许可
             drop(permit);
