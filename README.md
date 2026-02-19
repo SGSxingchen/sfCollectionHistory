@@ -95,6 +95,34 @@ curl http://localhost:8080/api/books/all/bid
 | `DATABASE_URL` | mysql://sf_root:...@mysql:3306/sf_selectrion | 后端数据库连接串 |
 | `NEXT_PUBLIC_API_URL` | http://127.0.0.1:8080 | 前端 API 地址（构建时设置） |
 
+### MySQL 数据持久化
+
+MySQL 数据存储在 Docker 命名卷 `mysql_data` 中（非项目目录内），查看实际存储路径：
+
+```bash
+docker volume inspect sfcollectionhistory_mysql_data
+```
+
+返回的 `Mountpoint` 即为宿主机上的数据目录，通常为：
+
+```
+/var/lib/docker/volumes/sfcollectionhistory_mysql_data/_data
+```
+
+> **注意：** `docker compose down` 不会删除数据，但 `docker compose down -v` 会**永久删除**数据卷。
+
+如需备份数据库：
+
+```bash
+docker exec sf-mysql mysqldump -usf_root -plijiaxinga1. sf_selectrion > backup.sql
+```
+
+如需恢复：
+
+```bash
+docker exec -i sf-mysql mysql -usf_root -plijiaxinga1. sf_selectrion < backup.sql
+```
+
 ### 常用命令
 
 ```bash
