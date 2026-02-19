@@ -8,6 +8,8 @@ import { BookRank } from '@/types/book';
 import lodash from 'lodash';
 import { useRouter } from 'next/navigation';
 import { bookIsEunuch } from '@/untils';
+import { SearchOutlined } from '@ant-design/icons';
+
 const Ranks = () => {
   const router = useRouter();
   const [loading, setLoading] = useState<boolean>(false);
@@ -27,6 +29,19 @@ const Ranks = () => {
         dataIndex: 'rank',
         fixed: true,
         key: 'rank',
+        render(value: number) {
+          if (value <= 3) {
+            const colors: Record<number, string> = { 1: 'gold', 2: '#aaa', 3: '#cd7f32' };
+            return (
+              <span
+                className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-lg text-white text-[13px] font-bold"
+                style={{ background: colors[value] }}>
+                {value}
+              </span>
+            );
+          }
+          return <span className="text-gray-500 font-medium">{value}</span>;
+        },
       },
       {
         width: 150,
@@ -39,7 +54,7 @@ const Ranks = () => {
               onClick={() => {
                 router.push(`/detail?bookId=${item.b_id}`);
               }}
-              className={'text-primary cursor-pointer'}>
+              className={'text-primary cursor-pointer hover:text-secondary transition-colors font-medium'}>
               {value}
             </div>
           );
@@ -63,7 +78,6 @@ const Ranks = () => {
         dataIndex: 'tags',
         key: 'tags',
         render(value: string, item: BookRank) {
-          // 判断时间是否比当前时间早超过30天
           const isMoreThan30DaysOld = bookIsEunuch(
             item.last_update_time,
             item.finish,
@@ -136,7 +150,8 @@ const Ranks = () => {
           <img
             src={coverUrl}
             alt="cover"
-            style={{ width: '120px', height: 'auto' }}
+            className="rounded-md shadow-sm"
+            style={{ width: '100px', height: 'auto' }}
           />
         ),
       },
@@ -269,76 +284,80 @@ const Ranks = () => {
     loadTableData(1, 10);
   }, []);
   return (
-    <div className={'p-2 w-full h-full flex flex-col books-rank'}>
-      <div className="query mt-4">
-        <div className="flex custom-mobile:flex-col gap-4">
-          <div className="item flex items-center">
-            <div className="label w-[80px]">书名:</div>
-            <div className="content">
-              <Input
-                value={bookName}
-                onChange={(e) => setBookName(e.target.value)}
-              />
-            </div>
+    <div className={'w-full h-full flex flex-col books-rank'}>
+      <h1 className="sf-section-title mb-4">排行榜</h1>
+
+      {/* Query Card */}
+      <div className="sf-card mb-6">
+        <div className="flex flex-wrap custom-mobile:flex-col gap-4 items-end">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 w-[70px]">书名:</span>
+            <Input
+              className="w-[180px]"
+              placeholder="搜索书名"
+              value={bookName}
+              onChange={(e) => setBookName(e.target.value)}
+            />
           </div>
-          <div className="item flex items-center">
-            <div className="label w-[80px]">排序方式:</div>
-            <div className="content">
-              <Select
-                className={'w-[90px]'}
-                options={sortTypes}
-                onChange={(value) => setSortType(value)}
-                value={sortType}
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 w-[70px]">排序方式:</span>
+            <Select
+              className={'w-[120px]'}
+              options={sortTypes}
+              onChange={(value) => setSortType(value)}
+              value={sortType}
+            />
           </div>
-          <div className="item flex items-center">
-            <div className="label w-[80px]">征文类型:</div>
-            <div className="content">
-              <LabelTypeSearchSelecter
-                placeholder={'请选择征文类型'}
-                className={'w-[210px]'}
-                onChange={(value) => setLabelType(value)}
-                value={labelType}
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 w-[70px]">征文类型:</span>
+            <LabelTypeSearchSelecter
+              placeholder={'请选择征文类型'}
+              className={'w-[210px]'}
+              onChange={(value) => setLabelType(value)}
+              value={labelType}
+            />
           </div>
-          <div className={'item flex items-center'}>
-            <Button
-              onClick={() => {
-                loadTableData(1, size);
-              }}>
-              查询
-            </Button>
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={() => {
+              loadTableData(1, size);
+            }}>
+            查询
+          </Button>
+        </div>
+      </div>
+
+      <div className="sf-card p-0 overflow-hidden">
+        <div
+          ref={tableRef}
+          className="h-[80vh] relative w-full overflow-hidden">
+          <div className={'absolute w-full h-full'}>
+            <Table
+              loading={loading}
+              tableLayout={'fixed'}
+              pagination={false}
+              scroll={{
+                x: columns.reduce((count, item) => {
+                  count += item?.width as number;
+                  return count;
+                }, 0),
+                y: 'calc(80vh - 100px)',
+              }}
+              columns={columns}
+              className={'w-full'}
+              bordered
+              dataSource={tableData}
+              rowKey="id"
+              rowClassName={(_, index) =>
+                index % 2 === 0 ? 'bg-white' : 'bg-[#faf8f5]'
+              }
+            />
           </div>
         </div>
       </div>
-      <div
-        ref={tableRef}
-        className="table h-[80vh] relative mt-4 w-full overflow-hidden">
-        <div className={'absolute w-full h-full'}>
-          <Table
-            // key={tableHeight}
-            loading={loading}
-            tableLayout={'fixed'}
-            pagination={false}
-            scroll={{
-              x: columns.reduce((count, item) => {
-                count += item?.width as number;
-                return count;
-              }, 0),
-              y: 'calc(80vh - 100px)',
-            }} // 确保x值足够宽，y值足够高
-            columns={columns}
-            className={'w-full'}
-            bordered
-            // virtual
-            dataSource={tableData}
-            rowKey="id" // 确保每行数据有一个唯一的key
-          />
-        </div>
-      </div>
-      <div className="page mt-6 flex justify-end">
+
+      <div className="mt-6 flex justify-center">
         <Pagination
           onChange={(page, size) => {
             loadTableData(page, size);

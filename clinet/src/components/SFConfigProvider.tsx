@@ -10,13 +10,33 @@ const SFConfigProvider: React.FC<SFConfigProviderProps> = ({ children }) => {
       <ConfigProvider
         theme={{
           token: {
-            // Seed Token，影响范围大
             colorPrimary: '#e29464',
-            borderRadius: 2,
-            // 派生变量，影响范围小
-            colorBgContainer: '#faf9f9',
+            borderRadius: 8,
+            colorBgContainer: '#ffffff',
           },
-          components: {},
+          components: {
+            Button: {
+              borderRadius: 8,
+              controlHeight: 36,
+            },
+            Input: {
+              borderRadius: 8,
+              controlHeight: 36,
+            },
+            Select: {
+              borderRadius: 8,
+              controlHeight: 36,
+            },
+            Table: {
+              headerBg: '#faf5ee',
+              headerColor: '#5a3e2b',
+              rowHoverBg: '#fdf5ed',
+              borderColor: '#f0e6dd',
+            },
+            Card: {
+              borderRadiusLG: 12,
+            },
+          },
         }}>
         {children}
       </ConfigProvider>

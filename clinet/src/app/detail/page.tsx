@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { DatePicker, Tooltip, Select, Button, Spin, message } from 'antd';
+import { DatePicker, Tooltip, Select, Button, Spin, message, Tag } from 'antd';
 import { getBookDetail, getBookDetailHistory } from '@/client_api/detail';
 import { BookInfo } from '@/types/book';
 import { alignBookData, bookIsEunuch } from '@/untils';
@@ -10,6 +10,11 @@ import DataLineCharts from '@/components/DataLineCharts';
 import dayjs from 'dayjs';
 import BookSelect from '@/components/BookSelect';
 import SuspenseSpin from '@/components/SuspenseSpin';
+import {
+  CalendarOutlined,
+  SearchOutlined,
+  SwapOutlined,
+} from '@ant-design/icons';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -31,7 +36,7 @@ const BookDetailPage = () => {
   const query = useSearchParams();
   const [datePicker, setDatePicker] = useState<any>([
     dayjs().subtract(365, 'day'),
-    dayjs(), // Today
+    dayjs(),
   ]);
   const [otherBookId, setOtherBookId] = useState('');
   const [otherBookDetail, setOtherBookDetail] = useState<BookInfo | null>(null);
@@ -127,17 +132,17 @@ const BookDetailPage = () => {
         return (
           <Tooltip
             title={'已太监, 作品数据将不再维护, 恢复更新后, 请手动提交维护。'}>
-            已太监
+            <Tag color="red" bordered={false}>已太监</Tag>
           </Tooltip>
         );
       }
       return bookDetail.finish === 1 ? (
         <Tooltip
           title={'完结作品数据将不再维护, 状态如有更新, 请手动提交维护。'}>
-          已完结
+          <Tag color="green" bordered={false}>已完结</Tag>
         </Tooltip>
       ) : (
-        '连载中'
+        <Tag color="blue" bordered={false}>连载中</Tag>
       );
     }
     return false;
@@ -187,43 +192,48 @@ const BookDetailPage = () => {
   return (
     <div>
       {contextHolder}
-      <h1>作品详情/历史数据</h1>
-      <p className={'text-primary'}>
-        注意: 连载作品超过30天未更新, 状态视为太监,
-        数据将不再进行维护。完结作品数据, 也将不再维护。
-      </p>
-      <p className={'text-primary mt-2'}>
-        默认最大查询时间范围为: 1年；按年查询, 范围最大5年。
-      </p>
-      <div className="query mt-4 gap-4 custom-mobile:flex-col flex items-start">
-        <div className="line flex items-center">
-          <div className="label w-[100px]">时间范围:</div>
-          <RangePicker
-            value={datePicker}
-            onChange={(dates) => setDatePicker(dates)}
-          />
-        </div>
-        <div className="line flex items-center">
-          <div className="label w-[100px]">分组类型:</div>
-          <Select value={groupType} onChange={setGroupType}>
-            <Option value={1}>天</Option>
-            <Option value={2}>月</Option>
-            <Option value={3}>年</Option>
-          </Select>
-        </div>
-        <div className="line flex items-center">
-          <div className="label w-[100px]">对比作品:</div>
-          <div className="flex-1">
+      <h1 className="sf-section-title mb-2">作品详情 / 历史数据</h1>
+      <div className="text-sm text-grayLine space-y-1 mb-4">
+        <p>
+          注意: 连载作品超过30天未更新, 状态视为太监,
+          数据将不再进行维护。完结作品数据, 也将不再维护。
+        </p>
+        <p>
+          默认最大查询时间范围为: 1年；按年查询, 范围最大5年。
+        </p>
+      </div>
+
+      {/* Query Card */}
+      <div className="sf-card mb-6">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex items-center gap-2">
+            <CalendarOutlined className="text-primary" />
+            <span className="text-sm text-gray-500 w-[70px]">时间范围:</span>
+            <RangePicker
+              value={datePicker}
+              onChange={(dates) => setDatePicker(dates)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 w-[70px]">分组类型:</span>
+            <Select value={groupType} onChange={setGroupType}>
+              <Option value={1}>天</Option>
+              <Option value={2}>月</Option>
+              <Option value={3}>年</Option>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <SwapOutlined className="text-primary" />
+            <span className="text-sm text-gray-500 w-[70px]">对比作品:</span>
             <BookSelect
               className={'w-[200px]'}
               value={otherBookId}
               onChange={setOtherBookId}
             />
           </div>
-        </div>
-        <div>
           <Button
             type={'primary'}
+            icon={<SearchOutlined />}
             onClick={() => {
               loadHistory(query.get('bookId') as string);
               loadOtherHistory();
@@ -233,64 +243,69 @@ const BookDetailPage = () => {
           </Button>
         </div>
       </div>
+
       <Spin spinning={loading}>
         <div
           className={
-            'book-detail mt-4 p-2 grid custom-pc:grid-cols-2 gap-4 custom-mobile:grid-cols-1'
+            'grid custom-pc:grid-cols-2 gap-6 custom-mobile:grid-cols-1'
           }>
-          <div className="detail shadow flex">
-            <div className={'flex-1 mr-2'}>
+          {/* Book Info Card */}
+          <div className="sf-card flex gap-4">
+            <div className="w-[140px] flex-shrink-0">
               <img
-                className={'w-full'}
+                className="w-full rounded-lg shadow-sm"
                 src={bookDetail?.cover_url}
                 alt={'cover_url'}
               />
             </div>
-            <div className="infos mt-4 flex-1 flex flex-col">
-              <h2 className={'text-theme-brand mb-4 text-[24px]'}>
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <h2 className="text-primary text-[22px] font-bold">
                 {bookDetail?.book_name}
               </h2>
-              <p className={'flex text-grayLine'}>
-                <span className="label w-[40px]">字数:</span>
+              <div className="flex items-center gap-2 text-sm text-grayLine">
+                <span className="font-medium text-gray-500">字数:</span>
                 {bookDetail?.word_count.toLocaleString()}
-              </p>
-              <p className={'flex mt-2 text-grayLine'}>
-                <span className="label w-[40px]">类型:</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-grayLine">
+                <span className="font-medium text-gray-500">类型:</span>
                 {bookDetail?.book_type}
-              </p>
-              <p className={'flex text-grayLine mt-2'}>
-                <span className="label w-[40px]">状态:</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium text-gray-500">状态:</span>
                 {bookStatus}
-              </p>
+              </div>
             </div>
           </div>
-          <div className="date-line shadow p-4">
+
+          {/* Chart Cards */}
+          <div className="sf-card">
+            <div className="sf-card-title">点击数据</div>
             {getBookDataLine('tap_num', '点击数据')}
           </div>
-          <div className="date-line shadow p-4">
+          <div className="sf-card">
+            <div className="sf-card-title">点赞数据</div>
             {getBookDataLine('like_num', '点赞数据')}
           </div>
-          <div className="date-line shadow p-4">
+          <div className="sf-card">
+            <div className="sf-card-title">收藏数据</div>
             {getBookDataLine('collect_num', '收藏数据')}
           </div>
-          <div className="date-line shadow p-4">
+          <div className="sf-card">
+            <div className="sf-card-title">评论数据</div>
             {getBookDataLine('comment_num', '评论数据')}
           </div>
-          <div className="date-line shadow p-4">
+          <div className="sf-card">
+            <div className="sf-card-title">长评数据</div>
             {getBookDataLine('comment_long_num', '长评数据')}
           </div>
-          <div className="date-line shadow p-4">
+          <div className="sf-card">
+            <div className="sf-card-title">月票数据</div>
             {getBookDataLine('monthly_pass', '月票数据')}
           </div>
-          <div className="date-line shadow p-4">
+          <div className="sf-card">
+            <div className="sf-card-title">字数数据</div>
             {getBookDataLine('word_count', '字数数据')}
           </div>
-          {/*<div className="date-line shadow p-4">*/}
-          {/*  {getBookDataLine('monthly_ticket_ranking', '月票排行数据')}*/}
-          {/*</div>*/}
-          {/*<div className="date-line shadow p-4">*/}
-          {/*  {getBookDataLine('reward_ranking', '打赏排行数据')}*/}
-          {/*</div>*/}
         </div>
       </Spin>
     </div>
