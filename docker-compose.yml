@@ -19,17 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  migrate:
-    image: mysql:8.0
-    container_name: sf-migrate
-    depends_on:
-      mysql:
-        condition: service_healthy
-    volumes:
-      - ./mysql/init:/init
-    entrypoint: ["sh", "-c", "mysql -h mysql -usf_root -plijiaxinga1. sf_selectrion < /init/init.sql"]
-    restart: "no"
-
   server:
     image: lanstard/sf-server:latest
     build:
@@ -37,8 +26,8 @@ services:
     container_name: sf-server
     restart: unless-stopped
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
     environment:
       DATABASE_URL: "mysql://sf_root:lijiaxinga1.@mysql:3306/sf_selectrion"
       SF_DATA_BASE_URL: "https://book.sfacg.com"
