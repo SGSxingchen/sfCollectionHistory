@@ -1,38 +1,112 @@
 # SFACG Data Analysis Project
 
-本项目是用于爬取并分析 [菠萝包轻小说](https://book.sfacg.com/) 网站数据，并为作者提供实时的数据上涨情况以及与同行作品的对比分析。
+本项目用于爬取并分析 [菠萝包轻小说](https://book.sfacg.com/) 网站数据，为作者提供实时的数据上涨情况以及与同行作品的对比分析。
+
 ## 生产环境地址
+
 [SF数据网](http://sfacg.cloud/ranks)
+
 ## 目录结构
 
-- `client` 文件夹：基于 Next.js 技术 SSG 构建的网页客户端，使用了 TailwindCSS 和 Ant Design 组件库。
-- `script` 文件夹：基于 Cheerio 的爬虫，用于爬取菠萝包轻小说小说信息。
-- `server` 文件夹：使用 Actix-Web 和 Chrono 技术栈的服务端，采用三层架构设计（服务层、模块层、控制层），并使用 Cron 进行定时任务管理，每天对作品数据进行维护。
+- `clinet/` — Next.js SSG 客户端（TailwindCSS + Ant Design）
+- `server/` — Rust Actix-Web 后端（SQLx + MySQL + Cron 定时任务）
+- `script/` — Node.js 爬虫脚本
+- `mysql/init/` — 数据库初始化 SQL
 
-## 技术栈
+## 部署教程
 
-### 客户端
+### 前置要求
 
-- **Next.js**: 用于构建静态生成的网页客户端。
-- **TailwindCSS**: 用于快速开发响应式界面。
-- **Ant Design**: 用于提供丰富的 UI 组件。
+- 本地安装 [Docker](https://docs.docker.com/get-docker/) 和 Docker Compose
+- 拥有 [Docker Hub](https://hub.docker.com/) 账号（用于推送镜像）
 
-### 爬虫
-
-- **Cheerio**: 用于解析和操作 HTML，模拟 jQuery 的功能。
-
-### 服务端
-
-- **Actix-Web**: 用于构建高性能的 Web 服务。
-- **Chrono**: 用于处理日期和时间。
-- **Cron**: 用于管理定时任务，每天定时爬取并维护作品数据。
-- **MySQL**: 作为数据库，用于存储爬取的数据。
-- **SQLx**: 用于与 MySQL 数据库进行交互的查询工具。
-
-## 安装与使用
-
-### 克隆仓库
+### 1. 本地构建镜像
 
 ```bash
-git clone https://github.com/yourusername/sfacg-data-analysis.git
-cd sfacg-data-analysis
+git clone <仓库地址>
+cd sfCollectionHistory
+
+# 如需修改前端 API 地址（默认 http://127.0.0.1:8080）
+# 编辑 docker-compose.yml 中 client.build.args.NEXT_PUBLIC_API_URL
+
+# 构建
+docker compose build
+```
+
+### 2. 推送镜像到 Docker Hub
+
+```bash
+docker login
+docker compose push
+```
+
+镜像地址：
+- `lanstard/sf-server:latest`
+- `lanstard/sf-client:latest`
+
+### 3. 服务器部署
+
+服务器上只需两个文件：
+
+```
+├── docker-compose.yml
+└── mysql/
+    └── init/
+        └── init.sql
+```
+
+执行：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### 4. 验证
+
+```bash
+# 检查服务状态
+docker compose ps
+
+# 测试后端接口
+curl http://localhost:8080/api/books/all/bid
+
+# 访问前端页面
+# 浏览器打开 http://localhost:3000
+```
+
+### 服务说明
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| MySQL | 3306 | 数据库，数据持久化到 `mysql_data` 卷 |
+| Server | 8080 | Rust 后端 API |
+| Client | 3000 | Nginx 托管的静态前端 |
+
+### 环境变量
+
+在 `docker-compose.yml` 中可配置：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MYSQL_ROOT_PASSWORD` | root | MySQL root 密码 |
+| `MYSQL_USER` | sf_root | 应用数据库用户名 |
+| `MYSQL_PASSWORD` | lijiaxinga1. | 应用数据库密码 |
+| `DATABASE_URL` | mysql://sf_root:...@mysql:3306/sf_selectrion | 后端数据库连接串 |
+| `NEXT_PUBLIC_API_URL` | http://127.0.0.1:8080 | 前端 API 地址（构建时设置） |
+
+### 常用命令
+
+```bash
+# 查看日志
+docker compose logs -f
+
+# 重启服务
+docker compose restart
+
+# 停止并清理
+docker compose down
+
+# 停止并清理（含数据库数据）
+docker compose down -v
+```
