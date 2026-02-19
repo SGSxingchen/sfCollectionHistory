@@ -11,7 +11,7 @@ const addBookWithRetry = async (number) => {
   let retries = 0
   while (retries < MAX_RETRIES) {
     try {
-      const data = await axios.post('https://api.sfacg.cloud:18080/api/books/add/' + number, null, {
+      const data = await axios.post('http://127.0.0.1:8080/api/books/add/' + number, null, {
         timeout: 30000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
