@@ -27,3 +27,4 @@ regex = "1.5"
 # End Generation Here
 # Start Generation Here
 actix-cors = "0.6"
+rand = "0.8"

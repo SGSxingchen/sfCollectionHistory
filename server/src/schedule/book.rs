@@ -2,14 +2,14 @@ use crate::service::book_services;
 use actix_web::Error;
 use cron::Schedule;
 use futures::future;
+use rand::Rng;
 use std::{str::FromStr, sync::Arc};
 use tokio::{
     sync::Semaphore,
     time::{sleep_until, Duration, Instant},
 };
 async fn push_sf_book_new_data(bid: i32) -> Result<(), Error> {
-    // 最大重试次数
-    const MAX_RETRIES: u32 = 20;
+    const MAX_RETRIES: u32 = 5;
     let book = {
         let mut retries = 0;
         loop {
@@ -18,8 +18,14 @@ async fn push_sf_book_new_data(bid: i32) -> Result<(), Error> {
                 Err(e) => {
                     retries += 1;
                     if retries >= MAX_RETRIES {
+                        log::error!("爬取书本 {} 失败，已重试 {} 次: {:?}", bid, retries, e);
                         return Err(e);
                     }
+                    // 指数退避：base 5s，每次翻倍，最大 60s，加随机抖动
+                    let backoff = std::cmp::min(5 * 2u64.pow(retries - 1), 60);
+                    let jitter = rand::thread_rng().gen_range(0..3);
+                    log::warn!("爬取书本 {} 第 {} 次重试，等待 {}s", bid, retries, backoff + jitter);
+                    tokio::time::sleep(Duration::from_secs(backoff + jitter)).await;
                 }
             }
         }
@@ -31,8 +37,12 @@ async fn push_sf_book_new_data(bid: i32) -> Result<(), Error> {
             Err(e) => {
                 retries += 1;
                 if retries >= MAX_RETRIES {
+                    log::error!("插入书本 {} 失败，已重试 {} 次: {:?}", bid, retries, e);
                     return Err(e);
                 }
+                let backoff = std::cmp::min(5 * 2u64.pow(retries - 1), 60);
+                let jitter = rand::thread_rng().gen_range(0..3);
+                tokio::time::sleep(Duration::from_secs(backoff + jitter)).await;
             }
         }
     }
@@ -42,8 +52,8 @@ async fn push_sf_book_new_data(bid: i32) -> Result<(), Error> {
 async fn async_fn() -> Result<(), actix_web::Error> {
     let bids = book_services::BookServices::find_sf_all_bid().await?;
     let mut tasks = Vec::new();
-    // 使用信号量来控制并发数，优化单线程并发效率
-    let semaphore = Arc::new(Semaphore::new(50));
+    // 使用信号量来控制并发数，降低并发避免被反爬封禁
+    let semaphore = Arc::new(Semaphore::new(5));
     for id in bids {
         // 克隆Arc以共享Semaphore
         let semaphore_clone = semaphore.clone();
@@ -52,6 +62,9 @@ async fn async_fn() -> Result<(), actix_web::Error> {
             let permit = semaphore_clone.acquire_owned().await.unwrap();
             // 执行耗费资源的异步任务
             let res = push_sf_book_new_data(id).await;
+            // 任务完成后随机延迟 2~5s，控制整体请求频率
+            let delay = rand::thread_rng().gen_range(2000..=5000);
+            tokio::time::sleep(Duration::from_millis(delay)).await;
             // 显式释放许可，让其他等待的任务可以获取许可
             drop(permit);
             res

@@ -5,12 +5,33 @@ use crate::model::response::{ResponsPagerList, ResponsPagerListFrom};
 use crate::{model::book::Book, mysql::client};
 use actix_web::{self};
 use futures::try_join;
+use rand::Rng;
 use regex::Regex;
 use reqwest;
 use scraper::{Html, Selector};
 use serde_json;
 use sqlx;
 use std::env;
+use std::sync::LazyLock;
+
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".parse().unwrap());
+    headers.insert("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8".parse().unwrap());
+    headers.insert("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8".parse().unwrap());
+    headers.insert("Referer", "https://book.sfacg.com/".parse().unwrap());
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap()
+});
+
+async fn random_delay(min_ms: u64, max_ms: u64) {
+    let delay = rand::thread_rng().gen_range(min_ms..=max_ms);
+    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+}
+
 pub struct BookServices;
 impl BookServices {
     // 暴露给控制器, 用于收录书本的api
@@ -393,7 +414,7 @@ impl BookServices {
         let api_url = format!("{}/ajax/ashx/GetRelateWord.ashx?t=1", base_head_url);
 
         let form = [("keyword", keyword)];
-        let response = reqwest::Client::new()
+        let response = HTTP_CLIENT
             .post(&api_url)
             .form(&form)
             .send()
@@ -455,16 +476,18 @@ impl BookServices {
         let mut finish = 0;
         let mut word_count = 0;
         // 并发请求
-        let master_web_feature = reqwest::get(&url);
-        let mobild_web_feature = reqwest::get(&label_info_url);
+        let master_web_feature = HTTP_CLIENT.get(&url).send();
+        let mobild_web_feature = HTTP_CLIENT.get(&label_info_url).send();
         // 等待主站请求响应
         let response = master_web_feature
             .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?; // Map reqwest error to actix_web error
-        // 等待移动端请求响应                                                                 // 爬取移动端数据
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        // 等待移动端请求响应
         let label_info_response = mobild_web_feature
             .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        // 随机延迟 1~3s，模拟浏览器行为
+        random_delay(1000, 3000).await;
         // 确保请求成功
         if response.status().is_success() {
             // 获取响应的文本内容
@@ -533,7 +556,7 @@ impl BookServices {
                 book_id,
                 chrono::Utc::now().timestamp_millis()
             );
-            let comments_response = reqwest::get(&comments_url)
+            let comments_response = HTTP_CLIENT.get(&comments_url).send()
                 .await
                 .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
@@ -551,6 +574,8 @@ impl BookServices {
                     "Failed to fetch comments",
                 ));
             }
+            // 随机延迟 1~3s
+            random_delay(1000, 3000).await;
             // 查询书本封面
             let cover_selector = Selector::parse(".books-box .left-part .figure .pic img").unwrap();
             if let Some(cover_element) = document.select(&cover_selector).next() {
@@ -568,7 +593,7 @@ impl BookServices {
                 base_head_url, "/ajax/ashx/Common.ashx?op=ticketinfo"
             );
 
-            let ticket_info_response = reqwest::Client::new()
+            let ticket_info_response = HTTP_CLIENT
                 .post(&ticket_info_url)
                 .form(&[("nid", book_id.to_string())])
                 .send()
@@ -590,11 +615,13 @@ impl BookServices {
                     "Failed to fetch ticket info",
                 ));
             }
+            // 随机延迟 1~3s
+            random_delay(1000, 3000).await;
             // 查询今日打赏数据
             let bonus_info_url =
                 format!("{}{}", base_head_url, "/ajax/ashx/Common.ashx?op=bonusinfo");
 
-            let bonus_info_response = reqwest::Client::new()
+            let bonus_info_response = HTTP_CLIENT
                 .post(&bonus_info_url)
                 .form(&[("nid", book_id.to_string())])
                 .send()

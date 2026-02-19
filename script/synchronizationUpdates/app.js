@@ -1,6 +1,40 @@
 const cheerio = require('cheerio')
 const request = require('./request')
 const axios = require("axios");
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+const randomDelay = (min, max) => sleep(Math.floor(Math.random() * (max - min + 1)) + min)
+
+const MAX_RETRIES = 5
+
+const addBookWithRetry = async (number) => {
+  let retries = 0
+  while (retries < MAX_RETRIES) {
+    try {
+      const data = await axios.post('https://api.sfacg.cloud:18080/api/books/add/' + number, null, {
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      })
+      console.log(data.data, '添加结果')
+      return
+    } catch (err) {
+      retries++
+      console.log(`错误 (第${retries}次重试)`, err.status || err.message)
+      if (retries >= MAX_RETRIES) {
+        console.log(`书本 ${number} 添加失败，已达最大重试次数 ${MAX_RETRIES}`)
+        return
+      }
+      // 指数退避: min(3s * 2^retries, 30s) + 随机抖动
+      const backoff = Math.min(3000 * Math.pow(2, retries), 30000)
+      const jitter = Math.floor(Math.random() * 2000)
+      console.log(`等待 ${(backoff + jitter) / 1000}s 后重试...`)
+      await sleep(backoff + jitter)
+    }
+  }
+}
+
 const analyzeBooks = async (pageNum) => {
   const data = await request.get(`/List/default.aspx?tid=-1&&ud=30&PageIndex=${pageNum}`);
   if (data.status === 200) {
@@ -9,39 +43,25 @@ const analyzeBooks = async (pageNum) => {
     if (booksLink.length === 0) {
       return -1;
     }
-    const promise_all = []
+    // 顺序处理每本书，避免并发请求被封禁
+    const links = []
     booksLink.each((index, element) => {
-      promise_all.push(new Promise((resolve, reject) => {
-        const href = $(element).attr('href');
-        // 使用正则表达式匹配数字
-        const match = href.match(/\/Novel\/(\d+)\//);
-        const fetch = async () => {
-          try {
-            const number = match[1]; // 提取的数字
-            const data2 = await axios.post('https://api.sfacg.cloud:18080/api/books/add/' + number)
-            console.log(data2.data, '添加结果')
-            resolve()
-          } catch (err) {
-            // 发生错误重新执行
-            console.log('错误', err.status, err.data)
-            await new Promise((resolve) => {
-              setTimeout(() => {
-                resolve()
-              }, 2000)
-            })
-            await fetch()
-          }
-        }
-        if (match) {
-          fetch()
-        } else {
-          console.log('No match found');
-        }
-      }))
+      const href = $(element).attr('href');
+      const match = href.match(/\/Novel\/(\d+)\//)
+      if (match) {
+        links.push(match[1])
+      } else {
+        console.log('No match found');
+      }
     })
-    await Promise.all(promise_all)
+    for (const number of links) {
+      await addBookWithRetry(number)
+      // 每本书之间随机延迟 2~5s
+      await randomDelay(2000, 5000)
+    }
   }
 }
+
 const getStore = async () => {
   try {
     let pageNum = 1
@@ -53,9 +73,10 @@ const getStore = async () => {
         break;
       }
       pageNum++
+      // 每页之间随机延迟 3~8s
+      await randomDelay(3000, 8000)
     }
   } catch (err) {
-    // console.log('爬取完成')
     console.log(err)
     throw new Error('爬取首页错误')
   }
