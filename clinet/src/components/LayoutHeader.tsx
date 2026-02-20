@@ -5,12 +5,15 @@ import {
   HomeOutlined,
   MenuOutlined,
   CloseOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { usePathname, useRouter } from 'next/navigation';
+import GlobalBookSearch from '@/components/GlobalBookSearch';
 
 const navItems = [
   { key: '/', label: '首页', icon: <HomeOutlined /> },
   { key: '/ranks', label: '排行榜', icon: <FieldNumberOutlined /> },
+  { key: '/about', label: '关于', icon: <InfoCircleOutlined /> },
 ];
 
 const LayoutHeader = () => {
@@ -48,7 +51,7 @@ const LayoutHeader = () => {
           </span>
         </div>
 
-        {/* Desktop Nav */}
+        {/* Desktop Nav + Search */}
         <nav className="hidden custom-pc:flex items-center gap-1">
           {navItems.map((item) => {
             const isActive = pathname === item.key;
@@ -72,6 +75,13 @@ const LayoutHeader = () => {
               </div>
             );
           })}
+          <div className="ml-3">
+            <GlobalBookSearch
+              size="small"
+              placeholder="搜索作品..."
+              className="w-[200px]"
+            />
+          </div>
         </nav>
 
         {/* Mobile menu button */}
@@ -85,6 +95,14 @@ const LayoutHeader = () => {
       {/* Mobile dropdown */}
       {mobileMenuOpen && (
         <div className="custom-pc:hidden border-t border-white/20">
+          {/* Mobile search */}
+          <div className="px-4 py-3">
+            <GlobalBookSearch
+              size="middle"
+              placeholder="搜索作品..."
+              className="w-full"
+            />
+          </div>
           {navItems.map((item) => {
             const isActive = pathname === item.key;
             return (

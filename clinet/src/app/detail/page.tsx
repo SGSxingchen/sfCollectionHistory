@@ -1,12 +1,14 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { DatePicker, Tooltip, Select, Button, Spin, message, Tag } from 'antd';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { DatePicker, Select, Button, Spin, message, Tabs } from 'antd';
 import { getBookDetail, getBookDetailHistory } from '@/client_api/detail';
 import { BookInfo } from '@/types/book';
-import { alignBookData, bookIsEunuch } from '@/untils';
+import { alignBookData } from '@/untils';
+import { CHART_TABS } from '@/types/charts';
 import DataLineCharts from '@/components/DataLineCharts';
+import BookInfoStatCard from '@/components/BookInfoStatCard';
 import dayjs from 'dayjs';
 import BookSelect from '@/components/BookSelect';
 import SuspenseSpin from '@/components/SuspenseSpin';
@@ -122,31 +124,7 @@ const BookDetailPage = () => {
       setLoading(false);
     }
   };
-  const bookStatus = useMemo(() => {
-    if (bookDetail) {
-      const oldOver = bookIsEunuch(
-        bookDetail.last_update_time,
-        bookDetail.finish,
-      );
-      if (oldOver) {
-        return (
-          <Tooltip
-            title={'已太监, 作品数据将不再维护, 恢复更新后, 请手动提交维护。'}>
-            <Tag color="red" bordered={false}>已太监</Tag>
-          </Tooltip>
-        );
-      }
-      return bookDetail.finish === 1 ? (
-        <Tooltip
-          title={'完结作品数据将不再维护, 状态如有更新, 请手动提交维护。'}>
-          <Tag color="green" bordered={false}>已完结</Tag>
-        </Tooltip>
-      ) : (
-        <Tag color="blue" bordered={false}>连载中</Tag>
-      );
-    }
-    return false;
-  }, [bookDetail]);
+
   useEffect(() => {
     loadBookDetail();
     const bookId = query.get('bookId');
@@ -154,6 +132,7 @@ const BookDetailPage = () => {
       loadHistory(bookId);
     }
   }, []);
+
   const getBookDataLine = useCallback(
     (key: string, label: string) => {
       if (otherBooksHistory.length > 0 && otherBookId) {
@@ -165,6 +144,7 @@ const BookDetailPage = () => {
           <DataLineCharts
             xData={getChartX(alignedArr1)}
             title={label}
+            height={450}
             seriesData={[
               getChartService(bookDetail?.book_name ?? '', alignedArr1, key),
               getChartService(
@@ -180,6 +160,7 @@ const BookDetailPage = () => {
           <DataLineCharts
             xData={getChartX(booksHistory)}
             title={label}
+            height={450}
             seriesData={[
               getChartService(bookDetail?.book_name ?? '', booksHistory, key),
             ]}
@@ -189,6 +170,7 @@ const BookDetailPage = () => {
     },
     [booksHistory, bookDetail, otherBooksHistory, otherBookDetail],
   );
+
   return (
     <div>
       {contextHolder}
@@ -245,72 +227,25 @@ const BookDetailPage = () => {
       </div>
 
       <Spin spinning={loading}>
-        <div
-          className={
-            'grid custom-pc:grid-cols-2 gap-6 custom-mobile:grid-cols-1'
-          }>
-          {/* Book Info Card */}
-          <div className="sf-card flex gap-4">
-            <div className="w-[140px] flex-shrink-0">
-              <img
-                className="w-full rounded-lg shadow-sm"
-                src={bookDetail?.cover_url}
-                alt={'cover_url'}
-              />
-            </div>
-            <div className="flex-1 flex flex-col justify-center gap-2">
-              <h2 className="text-primary text-[22px] font-bold">
-                {bookDetail?.book_name}
-              </h2>
-              <div className="flex items-center gap-2 text-sm text-grayLine">
-                <span className="font-medium text-gray-500">字数:</span>
-                {bookDetail?.word_count.toLocaleString()}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-grayLine">
-                <span className="font-medium text-gray-500">类型:</span>
-                {bookDetail?.book_type}
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium text-gray-500">状态:</span>
-                {bookStatus}
-              </div>
-            </div>
-          </div>
+        {/* Book Info Stat Card */}
+        <BookInfoStatCard bookDetail={bookDetail} />
 
-          {/* Chart Cards */}
-          <div className="sf-card">
-            <div className="sf-card-title">点击数据</div>
-            {getBookDataLine('tap_num', '点击数据')}
-          </div>
-          <div className="sf-card">
-            <div className="sf-card-title">点赞数据</div>
-            {getBookDataLine('like_num', '点赞数据')}
-          </div>
-          <div className="sf-card">
-            <div className="sf-card-title">收藏数据</div>
-            {getBookDataLine('collect_num', '收藏数据')}
-          </div>
-          <div className="sf-card">
-            <div className="sf-card-title">评论数据</div>
-            {getBookDataLine('comment_num', '评论数据')}
-          </div>
-          <div className="sf-card">
-            <div className="sf-card-title">长评数据</div>
-            {getBookDataLine('comment_long_num', '长评数据')}
-          </div>
-          <div className="sf-card">
-            <div className="sf-card-title">月票数据</div>
-            {getBookDataLine('monthly_pass', '月票数据')}
-          </div>
-          <div className="sf-card">
-            <div className="sf-card-title">字数数据</div>
-            {getBookDataLine('word_count', '字数数据')}
-          </div>
+        {/* Charts in Tabs */}
+        <div className="sf-card mt-6">
+          <Tabs
+            defaultActiveKey="tap_num"
+            items={CHART_TABS.map((tab) => ({
+              key: tab.key,
+              label: tab.label,
+              children: getBookDataLine(tab.key, tab.label),
+            }))}
+          />
         </div>
       </Spin>
     </div>
   );
 };
+
 const DetailPage = () => {
   return (
     <Suspense fallback={<SuspenseSpin />}>

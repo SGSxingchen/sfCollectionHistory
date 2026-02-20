@@ -1,5 +1,5 @@
 'use client';
-import { Button, Input, Pagination, Select, Table, Tag, Tooltip } from 'antd';
+import { Button, Input, Pagination, Select, Segmented, Table, Tag, Tooltip } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sortTypes } from '@/types/enums';
 import LabelTypeSearchSelecter from '@/components/LabelTypeSearchSelecter';
@@ -8,7 +8,12 @@ import { BookRank } from '@/types/book';
 import lodash from 'lodash';
 import { useRouter } from 'next/navigation';
 import { bookIsEunuch } from '@/untils';
-import { SearchOutlined } from '@ant-design/icons';
+import {
+  SearchOutlined,
+  UnorderedListOutlined,
+  AppstoreOutlined,
+} from '@ant-design/icons';
+import RankCardGrid from '@/components/RankCardGrid';
 
 const Ranks = () => {
   const router = useRouter();
@@ -21,6 +26,8 @@ const Ranks = () => {
   const [current, setCurrent] = useState(1);
   const [size, setSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+
   const columns = useMemo(() => {
     const cols = [
       {
@@ -83,26 +90,26 @@ const Ranks = () => {
             item.finish,
           );
           const tags = value.split(',');
-          const tagsMap = tags.map((item) => (
+          const tagsMap = tags.map((tag, idx) => (
             <Tag
               className={'ml-1 mb-1'}
               color={'blue'}
               bordered={false}
-              key={item}>
-              {item}
+              key={`${tag}-${idx}`}>
+              {tag}
             </Tag>
           ));
           if (item.finish === 1) {
             tagsMap.push(
               <Tooltip
+                key={'完结'}
                 title={
                   '作品已完结, 数据不再维护, 状态如有更新, 请手动提交维护，'
                 }>
                 <Tag
                   className={'ml-1 mb-1'}
                   color={'success'}
-                  bordered={false}
-                  key={'太监'}>
+                  bordered={false}>
                   完结
                 </Tag>
               </Tooltip>,
@@ -110,14 +117,14 @@ const Ranks = () => {
           } else if (isMoreThan30DaysOld) {
             tagsMap.push(
               <Tooltip
+                key={'太监'}
                 title={
                   '超过30天未更新, 将不再维护作品数据。作品恢复更新后, 请手动提交维护。'
                 }>
                 <Tag
                   className={'ml-1 mb-1'}
                   color={'red'}
-                  bordered={false}
-                  key={'太监'}>
+                  bordered={false}>
                   太监
                 </Tag>
               </Tooltip>,
@@ -125,14 +132,14 @@ const Ranks = () => {
           } else {
             tagsMap.push(
               <Tooltip
+                key={'连载中'}
                 title={
                   '正常连载中, 如果30天未更新, 作品将会太监, 数据不再正常维护。'
                 }>
                 <Tag
                   className={'ml-1 mb-1'}
                   color={'success'}
-                  bordered={false}
-                  key={'太监'}>
+                  bordered={false}>
                   连载中
                 </Tag>
               </Tooltip>,
@@ -259,7 +266,7 @@ const Ranks = () => {
     try {
       const data = await getRankRecord({
         current: newPage || current,
-        size: newSize || current,
+        size: newSize || size,
         sort_type: sortType,
         label_type: labelType,
         book_name: bookName,
@@ -281,7 +288,7 @@ const Ranks = () => {
     }
   };
   useEffect(() => {
-    loadTableData(1, 10);
+    loadTableData(1, 20);
   }, []);
   return (
     <div className={'w-full h-full flex flex-col books-rank'}>
@@ -328,34 +335,56 @@ const Ranks = () => {
         </div>
       </div>
 
-      <div className="sf-card p-0 overflow-hidden">
-        <div
-          ref={tableRef}
-          className="h-[80vh] relative w-full overflow-hidden">
-          <div className={'absolute w-full h-full'}>
-            <Table
-              loading={loading}
-              tableLayout={'fixed'}
-              pagination={false}
-              scroll={{
-                x: columns.reduce((count, item) => {
-                  count += item?.width as number;
-                  return count;
-                }, 0),
-                y: 'calc(80vh - 100px)',
-              }}
-              columns={columns}
-              className={'w-full'}
-              bordered
-              dataSource={tableData}
-              rowKey="id"
-              rowClassName={(_, index) =>
-                index % 2 === 0 ? 'bg-white' : 'bg-[#faf8f5]'
-              }
-            />
+      {/* View Toggle + Count */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-sm text-grayLine">
+          共 {total} 部作品
+        </div>
+        <Segmented
+          options={[
+            { label: '表格', value: 'table', icon: <UnorderedListOutlined /> },
+            { label: '卡片', value: 'card', icon: <AppstoreOutlined /> },
+          ]}
+          value={viewMode}
+          onChange={(value) => setViewMode(value as 'table' | 'card')}
+        />
+      </div>
+
+      {/* Content */}
+      {viewMode === 'table' ? (
+        <div className="sf-card p-0 overflow-hidden">
+          <div
+            ref={tableRef}
+            className="h-[80vh] relative w-full overflow-hidden">
+            <div className={'absolute w-full h-full'}>
+              <Table
+                loading={loading}
+                tableLayout={'fixed'}
+                pagination={false}
+                scroll={{
+                  x: columns.reduce((count, item) => {
+                    count += item?.width as number;
+                    return count;
+                  }, 0),
+                  y: 'calc(80vh - 100px)',
+                }}
+                columns={columns}
+                className={'w-full'}
+                bordered
+                dataSource={tableData}
+                rowKey="id"
+                rowClassName={(_, index) =>
+                  index % 2 === 0 ? 'bg-white' : 'bg-[#faf8f5]'
+                }
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="sf-card">
+          <RankCardGrid data={tableData} loading={loading} sortType={sortType} />
+        </div>
+      )}
 
       <div className="mt-6 flex justify-center">
         <Pagination
