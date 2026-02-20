@@ -1,3 +1,4 @@
 .claude/settings.local.json
 script/synchronizationUpdates/backup.sql
 backup.sql
+CLAUDE.md
